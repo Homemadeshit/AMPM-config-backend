@@ -1,0 +1,6 @@
+﻿{
+  "watch": ["src"],
+  "ext": "ts,js,json",
+  "exec": "ts-node",
+  "args": ["src/index.ts"]
+}

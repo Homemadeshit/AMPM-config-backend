@@ -1,0 +1,19 @@
+{
+  "dimensionBaseEUR": {
+    "140x70":1070,"140x80":1070,"140x90":1070,"140x100":1070,
+    "160x70":1100,"160x80":1100,"160x90":1100,"160x100":1100,
+    "180x70":1140,"180x80":1140,"180x90":1140,"180x100":1140,
+    "200x70":1170,"200x80":1170,"200x90":1170,"200x100":1170
+  },
+  "base_table_only": 430,
+  "base_all_in_one": 900,
+  "startup_discount_eur": 25,
+  "first_order_discount_by_type": {
+    "table_only": 50,
+    "all_in_one": 150,
+    "dimensioned": 50
+  },
+  "delivery_surcharge_eur": { "60": 25, "45": 100, "30": 200, "7": 200 },
+  "advance_payment_discount_eur": { "none": 0, "50": 50, "100": 100 },
+  "two_pcs_line_discount_eur": 25
+}
