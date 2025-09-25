@@ -6,6 +6,7 @@ import { rateLimit } from "express-rate-limit";
 import { PriceInputSchema, calculatePrice } from "./price";
 import { reloadPricingConfig } from "./config";
 import { configSignature } from "./config-signature";
+import { PriceCalculatorService, PriceRequestSchema } from "./services/priceCalculator";
 import { sendInquiryEmail, InquiryData, PriceBreakdown } from "./email";
 
 const app = express();
@@ -24,6 +25,15 @@ const guard = (req: Request, res: Response, next: NextFunction) => {
 };
 
 const priceLimiter = rateLimit({ windowMs: 60_000, max: 60 });
+
+// Initialize Google Sheets price calculator (with error handling)
+let priceCalculator: PriceCalculatorService | null = null;
+try {
+  priceCalculator = new PriceCalculatorService();
+} catch (error) {
+  console.warn('Google Sheets not configured. Price calculator will be disabled.');
+  console.warn('Please set up GOOGLE_SPREADSHEET_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, and GOOGLE_PRIVATE_KEY in .env file');
+}
 
 app.get("/", (_req, res) => res.json({ ok: true, service: "inox-price-api" }));
 
@@ -50,6 +60,7 @@ function sanitizeOverrides(input: any, allow: boolean) {
   return safe;
 }
 
+// Legacy price endpoint (keep for backward compatibility)
 app.post("/price", priceLimiter, (req: Request, res: Response) => {
   const parsed = PriceInputSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "Invalid payload", details: parsed.error.flatten() });
@@ -61,6 +72,102 @@ app.post("/price", priceLimiter, (req: Request, res: Response) => {
     res.json(calculatePrice(payload));
   } catch (e: any) {
     res.status(500).json({ error: e?.message || "Internal error" });
+  }
+});
+
+// New Google Sheets price endpoint
+app.post("/price/sheets", priceLimiter, async (req: Request, res: Response) => {
+  if (!priceCalculator) {
+    return res.status(503).json({ 
+      error: "Google Sheets price calculator not available",
+      details: "Please configure Google Sheets credentials in environment variables"
+    });
+  }
+
+  try {
+    const parsed = PriceRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ 
+        error: "Invalid payload", 
+        details: parsed.error.flatten() 
+      });
+    }
+
+    const result = await priceCalculator.calculatePrice(parsed.data);
+    res.json(result);
+  } catch (error: any) {
+    console.error("Google Sheets price calculation error:", error);
+    res.status(500).json({ 
+      error: error.message || "Internal error",
+      details: "Failed to calculate price from Google Sheets"
+    });
+  }
+});
+
+// Force refresh Google Sheets cache
+app.post("/refresh-cache", async (_req, res) => {
+  if (!priceCalculator) {
+    return res.status(503).json({ 
+      error: "Price calculator not available",
+      details: "Please configure Google Sheets credentials"
+    });
+  }
+
+  try {
+    const result = await priceCalculator.forceRefreshCache();
+    res.json(result);
+  } catch (error: any) {
+    console.error("Cache refresh error:", error);
+    res.status(500).json({ 
+      error: error.message || "Internal error",
+      details: "Failed to refresh Google Sheets cache"
+    });
+  }
+});
+
+// Get available dimensions (for Big Table)
+app.get("/dimensions", (_req, res) => {
+  if (!priceCalculator) {
+    return res.status(503).json({ 
+      error: "Price calculator not available",
+      details: "Please configure Google Sheets credentials"
+    });
+  }
+
+  try {
+    const dimensions = priceCalculator.getAvailableDimensions();
+    res.json({ 
+      success: true, 
+      dimensions,
+      count: dimensions.length 
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      error: error.message || "Internal error" 
+    });
+  }
+});
+
+// Get available packages (for All-in-One)
+app.get("/packages", (_req, res) => {
+  if (!priceCalculator) {
+    return res.status(503).json({ 
+      error: "Price calculator not available",
+      details: "Please configure Google Sheets credentials"
+    });
+  }
+
+  try {
+    const packages = priceCalculator.getAvailablePackages();
+    res.json({ 
+      success: true, 
+      packages,
+      count: packages.length 
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      error: error.message || "Internal error" 
+    });
   }
 });
 
