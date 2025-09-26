@@ -7,7 +7,7 @@ import { PriceInputSchema, calculatePrice } from "./price";
 import { reloadPricingConfig } from "./config";
 import { configSignature } from "./config-signature";
 import { PriceCalculatorService, PriceRequestSchema } from "./services/priceCalculator";
-import { sendInquiryEmail, InquiryData, PriceBreakdown } from "./email";
+import { sendInquiryEmail, testEmailConnection, InquiryData, PriceBreakdown } from "./email";
 
 const app = express();
 app.set("trust proxy", 1); // DO/App Platform
@@ -194,6 +194,33 @@ app.post("/api/send-inquiry", async (req: Request, res: Response) => {
     res.status(500).json({ 
       error: "Failed to send inquiry email", 
       details: error.message 
+    });
+  }
+});
+
+// Test email connection
+app.get("/api/test-email", async (_req: Request, res: Response) => {
+  try {
+    const result = await testEmailConnection();
+    if (result.success) {
+      res.json({ 
+        ok: true, 
+        message: result.message,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(500).json({ 
+        ok: false, 
+        error: result.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({ 
+      ok: false, 
+      error: "Email test failed", 
+      details: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });

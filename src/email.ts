@@ -2,21 +2,21 @@ import nodemailer from 'nodemailer';
 
 // Email configuration
 const transporter = nodemailer.createTransport({
-  // Configure your email service here
-  // Example for Gmail:
-  service: 'gmail',
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
   auth: {
-    user: process.env.EMAIL_USER, // Your email
-    pass: process.env.EMAIL_PASS, // Your email password or app password
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
   },
-  // Example for SMTP:
-  // host: process.env.SMTP_HOST,
-  // port: parseInt(process.env.SMTP_PORT || '587'),
-  // secure: false,
-  // auth: {
-  //   user: process.env.SMTP_USER,
-  //   pass: process.env.SMTP_PASS,
-  // },
+  // Additional options for cPanel/shared hosting
+  tls: {
+    rejectUnauthorized: false // Accept self-signed certificates (common with shared hosting)
+  },
+  // Force authentication method
+  authMethod: 'PLAIN',
+  debug: true, // Enable debug logging
+  logger: true // Enable logging
 });
 
 export interface InquiryData {
@@ -49,7 +49,28 @@ export interface PriceBreakdown {
   total: number;
 }
 
+// Test email connection
+export async function testEmailConnection() {
+  try {
+    await transporter.verify();
+    console.log('✅ Email server connection verified successfully');
+    return { success: true, message: 'Email connection verified' };
+  } catch (error: any) {
+    console.error('❌ Email server connection failed:', error);
+    return { success: false, message: `Email connection failed: ${error.message}` };
+  }
+}
+
 export async function sendInquiryEmail(inquiry: InquiryData, priceBreakdown?: PriceBreakdown) {
+  // Validate email configuration
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    throw new Error('Email configuration missing: SMTP_USER and SMTP_PASS are required');
+  }
+
+  // Validate inquiry data
+  if (!inquiry.name || !inquiry.email || !inquiry.inquiryId) {
+    throw new Error('Invalid inquiry data: name, email, and inquiryId are required');
+  }
   const productType = inquiry.product_type === "dimensioned" 
     ? "Custom Dimensioned Table" 
     : inquiry.product_type.replace("_", " ").toUpperCase();
@@ -158,19 +179,26 @@ export async function sendInquiryEmail(inquiry: InquiryData, priceBreakdown?: Pr
     </div>
   `;
 
-  // Send email to company
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: 'office-international@ampm.si',
-    subject: `🔔 New INOX Table Inquiry - ${inquiry.inquiryId} - ${productType}`,
-    html: companyEmailHtml,
-  });
+  try {
+    // Send email to company
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to: process.env.EMAIL_TO || 'office-international@ampm.si',
+      subject: `🔔 New INOX Table Inquiry - ${inquiry.inquiryId} - ${productType}`,
+      html: companyEmailHtml,
+    });
 
-  // Send confirmation email to customer
-  await transporter.sendMail({
-    from: process.env.EMAIL_USER,
-    to: inquiry.email,
-    subject: `✅ Your INOX Table Inquiry Confirmation - ${inquiry.inquiryId}`,
-    html: customerEmailHtml,
-  });
+    // Send confirmation email to customer
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to: inquiry.email,
+      subject: `✅ Your INOX Table Inquiry Confirmation - ${inquiry.inquiryId}`,
+      html: customerEmailHtml,
+    });
+
+    console.log(`✅ Inquiry emails sent successfully for ${inquiry.inquiryId}`);
+  } catch (error: any) {
+    console.error(`❌ Failed to send inquiry emails for ${inquiry.inquiryId}:`, error);
+    throw new Error(`Email sending failed: ${error.message}`);
+  }
 }
