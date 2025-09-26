@@ -71,19 +71,12 @@ export interface InquiryData {
 }
 
 export interface PriceBreakdown {
-  base: number;
-  adjustments: {
-    startup_discount: number;
-    first_order_discount: number;
-    delivery_surcharge: number;
-    advance_payment_discount: number;
-    two_pcs_line_discount_total: number;
-    custom_unit_adjust_eur: number;
-    custom_line_adjust_eur: number;
-  };
-  unit: number;
-  subtotal: number;
-  total: number;
+  base_price: number;
+  total_price: number;
+  delivery_fee?: number;
+  discounts_applied?: number;
+  price_per_unit?: number;
+  quantity?: number;
 }
 
 // Test Mailjet connection
@@ -180,13 +173,12 @@ export async function sendInquiryEmail(inquiry: InquiryData, priceBreakdown?: Pr
         <div style="background: white; padding: 20px; border-radius: 12px;">
           <h2 style="color: #1e40af; margin-top: 0;">Price Breakdown</h2>
           <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-            <tr><td style="padding: 4px 0;">Base Price:</td><td style="text-align: right;">€${priceBreakdown.base}</td></tr>
-            <tr><td style="padding: 4px 0;">Startup Discount:</td><td style="text-align: right; color: #dc2626;">-€${priceBreakdown.adjustments.startup_discount}</td></tr>
-            <tr><td style="padding: 4px 0;">First Order Discount:</td><td style="text-align: right; color: #dc2626;">-€${priceBreakdown.adjustments.first_order_discount}</td></tr>
-            <tr><td style="padding: 4px 0;">Delivery Surcharge:</td><td style="text-align: right;">+€${priceBreakdown.adjustments.delivery_surcharge}</td></tr>
-            <tr><td style="padding: 4px 0;">Advance Payment Discount:</td><td style="text-align: right; color: #dc2626;">-€${priceBreakdown.adjustments.advance_payment_discount}</td></tr>
-            ${priceBreakdown.adjustments.two_pcs_line_discount_total > 0 ? `<tr><td style="padding: 4px 0;">Bulk Discount:</td><td style="text-align: right; color: #dc2626;">-€${priceBreakdown.adjustments.two_pcs_line_discount_total}</td></tr>` : ''}
-            <tr style="border-top: 2px solid #1e40af; font-weight: bold; font-size: 16px;"><td style="padding: 8px 0;">TOTAL:</td><td style="text-align: right; color: #059669;">€${priceBreakdown.total}</td></tr>
+            <tr><td style="padding: 4px 0;">Base Price:</td><td style="text-align: right;">€${priceBreakdown.base_price}</td></tr>
+            ${priceBreakdown.discounts_applied ? `<tr><td style="padding: 4px 0;">Discounts Applied:</td><td style="text-align: right; color: #dc2626;">-€${priceBreakdown.discounts_applied}</td></tr>` : ''}
+            ${priceBreakdown.delivery_fee ? `<tr><td style="padding: 4px 0;">Delivery Fee:</td><td style="text-align: right;">+€${priceBreakdown.delivery_fee}</td></tr>` : ''}
+            ${priceBreakdown.quantity && priceBreakdown.quantity > 1 ? `<tr><td style="padding: 4px 0;">Quantity:</td><td style="text-align: right;">${priceBreakdown.quantity} pieces</td></tr>` : ''}
+            ${priceBreakdown.price_per_unit ? `<tr><td style="padding: 4px 0;">Price per Unit:</td><td style="text-align: right;">€${priceBreakdown.price_per_unit}</td></tr>` : ''}
+            <tr style="border-top: 2px solid #1e40af; font-weight: bold; font-size: 16px;"><td style="padding: 8px 0;">TOTAL:</td><td style="text-align: right; color: #059669;">€${priceBreakdown.total_price}</td></tr>
           </table>
         </div>
         ` : ''}
