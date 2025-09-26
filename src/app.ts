@@ -233,7 +233,9 @@ app.get("/api/test-send-email", async (_req: Request, res: Response) => {
     const testInquiry: InquiryData = {
       inquiryId: "TEST-" + Date.now(),
       name: "Test User",
-      email: "your-email@example.com", // Change this to your email
+      email: "test@example.com",
+      phone: "+386 41 123 456",
+      company: "Test Company d.o.o.",
       product_type: "dimensioned",
       dimension: "200x90",
       quantity: 1,

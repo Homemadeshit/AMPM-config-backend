@@ -64,6 +64,8 @@ export interface InquiryData {
   quantity: number;
   name: string;
   email: string;
+  phone?: string;
+  company?: string;
   note: string;
   price?: number;
   timestamp: string;
@@ -164,6 +166,8 @@ export async function sendInquiryEmail(inquiry: InquiryData, priceBreakdown?: Pr
           <table style="width: 100%; border-collapse: collapse;">
             <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong>Name:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${inquiry.name}</td></tr>
             <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong>Email:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><a href="mailto:${inquiry.email}">${inquiry.email}</a></td></tr>
+            ${inquiry.phone ? `<tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong>Phone:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><a href="tel:${inquiry.phone}">${inquiry.phone}</a></td></tr>` : ''}
+            ${inquiry.company ? `<tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong>Company:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${inquiry.company}</td></tr>` : ''}
             <tr><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;"><strong>Submitted:</strong></td><td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">${inquiry.timestamp}</td></tr>
           </table>
           ${inquiry.note ? `<div style="margin-top: 15px;"><strong>Additional Notes:</strong><div style="background: #f1f5f9; padding: 10px; border-radius: 6px; margin-top: 5px;">${inquiry.note}</div></div>` : ''}
