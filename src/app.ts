@@ -7,7 +7,7 @@ import { PriceInputSchema, calculatePrice } from "./price";
 import { reloadPricingConfig } from "./config";
 import { configSignature } from "./config-signature";
 import { PriceCalculatorService, PriceRequestSchema } from "./services/priceCalculator";
-import { sendInquiryEmail, testEmailConnection, InquiryData, PriceBreakdown } from "./email";
+import { sendInquiryEmail, testEmailConnection, InquiryData, PriceBreakdown } from "./email-mailjet";
 
 const app = express();
 app.set("trust proxy", 1); // DO/App Platform
@@ -198,27 +198,63 @@ app.post("/api/send-inquiry", async (req: Request, res: Response) => {
   }
 });
 
+// Debug endpoint to check environment variables
+app.get("/api/debug-env", async (_req: Request, res: Response) => {
+  res.json({
+    hasPublicKey: !!process.env.MJ_APIKEY_PUBLIC,
+    hasPrivateKey: !!process.env.MJ_APIKEY_PRIVATE,
+    publicKeyLength: process.env.MJ_APIKEY_PUBLIC?.length || 0,
+    privateKeyLength: process.env.MJ_APIKEY_PRIVATE?.length || 0,
+    emailFrom: process.env.EMAIL_FROM,
+    emailTo: process.env.EMAIL_TO
+  });
+});
+
 // Test email connection
 app.get("/api/test-email", async (_req: Request, res: Response) => {
   try {
     const result = await testEmailConnection();
     if (result.success) {
-      res.json({ 
-        ok: true, 
-        message: result.message,
-        timestamp: new Date().toISOString()
-      });
+      res.json(result);
     } else {
-      res.status(500).json({ 
-        ok: false, 
-        error: result.message,
-        timestamp: new Date().toISOString()
-      });
+      res.status(500).json(result);
     }
   } catch (error: any) {
     res.status(500).json({ 
-      ok: false, 
-      error: "Email test failed", 
+      success: false, 
+      message: `Email test failed: ${error.message}` 
+    });
+  }
+});
+
+// Quick email test - sends a simple test email
+app.get("/api/test-send-email", async (_req: Request, res: Response) => {
+  try {
+    const testInquiry: InquiryData = {
+      inquiryId: "TEST-" + Date.now(),
+      name: "Test User",
+      email: "your-email@example.com", // Change this to your email
+      product_type: "dimensioned",
+      dimension: "200x90",
+      quantity: 1,
+      delivery_days: 30,
+      advance_payment: "50",
+      note: "This is a test inquiry from Mailjet integration",
+      price: 1200,
+      timestamp: new Date().toLocaleString()
+    };
+
+    await sendInquiryEmail(testInquiry);
+    
+    res.json({ 
+      success: true, 
+      message: "Test email sent successfully!",
+      inquiryId: testInquiry.inquiryId
+    });
+  } catch (error: any) {
+    res.status(500).json({ 
+      success: false, 
+      message: `Test email failed: ${error.message}`,
       details: error.message,
       timestamp: new Date().toISOString()
     });

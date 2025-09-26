@@ -1,23 +1,5 @@
-import nodemailer from 'nodemailer';
-
-// Email configuration
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: process.env.SMTP_PORT === '465', // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-  // Additional options for cPanel/shared hosting
-  tls: {
-    rejectUnauthorized: false // Accept self-signed certificates (common with shared hosting)
-  },
-  // Force authentication method
-  authMethod: 'PLAIN',
-  debug: true, // Enable debug logging
-  logger: true // Enable logging
-});
+// Mailjet Email Service for INOX Table Configurator
+// This replaces the old Nodemailer implementation with Mailjet API
 
 // Mailjet API configuration
 const MAILJET_API_URL = 'https://api.mailjet.com/v3.1/send';
@@ -41,6 +23,8 @@ async function sendMailjetEmail(emailData: {
     throw new Error('Mailjet API keys not configured: MJ_APIKEY_PUBLIC and MJ_APIKEY_PRIVATE are required');
   }
 
+  console.log('Testing Mailjet with keys:', PUBLIC_KEY.substring(0, 8) + '...', PRIVATE_KEY.substring(0, 8) + '...');
+  
   const response = await fetch(MAILJET_API_URL, {
     method: 'POST',
     headers: {
@@ -61,8 +45,12 @@ async function sendMailjetEmail(emailData: {
   const result = await response.json();
   
   if (!response.ok) {
-    console.error('Mailjet API error:', result);
-    throw new Error(`Mailjet API error: ${JSON.stringify(result)}`);
+    console.error('Mailjet API error:', {
+      status: response.status,
+      statusText: response.statusText,
+      result: result
+    });
+    throw new Error(`Mailjet API error: ${response.status} ${response.statusText} - ${JSON.stringify(result)}`);
   }
 
   return result;
@@ -98,28 +86,53 @@ export interface PriceBreakdown {
   total: number;
 }
 
-// Test email connection
+// Test Mailjet connection
 export async function testEmailConnection() {
   try {
-    await transporter.verify();
-    console.log('✅ Email server connection verified successfully');
-    return { success: true, message: 'Email connection verified' };
+    const PUBLIC_KEY = process.env.MJ_APIKEY_PUBLIC;
+    const PRIVATE_KEY = process.env.MJ_APIKEY_PRIVATE;
+    
+    console.log('Testing with keys:', PUBLIC_KEY?.substring(0, 8) + '...', PRIVATE_KEY?.substring(0, 8) + '...');
+    
+    if (!PUBLIC_KEY || !PRIVATE_KEY) {
+      throw new Error('Mailjet API keys not configured');
+    }
+
+    // Test with a simple API call to verify credentials
+    const response = await fetch('https://api.mailjet.com/v3/REST/contact', {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${PUBLIC_KEY}:${PRIVATE_KEY}`).toString('base64'),
+      },
+    });
+
+    const result = await response.text();
+    console.log('Mailjet API response:', response.status, response.statusText, result);
+
+    if (response.ok) {
+      console.log('✅ Mailjet API connection verified successfully');
+      return { success: true, message: 'Mailjet connection verified' };
+    } else {
+      console.error('❌ Mailjet API failed:', response.status, response.statusText, result);
+      throw new Error(`HTTP ${response.status}: ${response.statusText} - ${result}`);
+    }
   } catch (error: any) {
-    console.error('❌ Email server connection failed:', error);
-    return { success: false, message: `Email connection failed: ${error.message}` };
+    console.error('❌ Mailjet API connection failed:', error);
+    return { success: false, message: `Mailjet connection failed: ${error.message}` };
   }
 }
 
 export async function sendInquiryEmail(inquiry: InquiryData, priceBreakdown?: PriceBreakdown) {
-  // Validate email configuration
-  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    throw new Error('Email configuration missing: SMTP_USER and SMTP_PASS are required');
+  // Validate Mailjet configuration
+  if (!process.env.MJ_APIKEY_PUBLIC || !process.env.MJ_APIKEY_PRIVATE) {
+    throw new Error('Mailjet configuration missing: MJ_APIKEY_PUBLIC and MJ_APIKEY_PRIVATE are required');
   }
 
   // Validate inquiry data
   if (!inquiry.name || !inquiry.email || !inquiry.inquiryId) {
     throw new Error('Invalid inquiry data: name, email, and inquiryId are required');
   }
+
   const productType = inquiry.product_type === "dimensioned" 
     ? "Custom Dimensioned Table" 
     : inquiry.product_type.replace("_", " ").toUpperCase();
@@ -229,25 +242,65 @@ export async function sendInquiryEmail(inquiry: InquiryData, priceBreakdown?: Pr
   `;
 
   try {
-    // Send email to company
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
-      to: process.env.EMAIL_TO || 'office-international@ampm.si',
+    // Send email to company using Mailjet
+    await sendMailjetEmail({
+      from: {
+        Email: process.env.EMAIL_FROM || 'noreply@ampm.si',
+        Name: 'INOX Table Configurator'
+      },
+      to: [{
+        Email: process.env.EMAIL_TO || 'office-international@ampm.si',
+        Name: 'AM & PM Sales Team'
+      }],
       subject: `🔔 New INOX Table Inquiry - ${inquiry.inquiryId} - ${productType}`,
-      html: companyEmailHtml,
+      html: companyEmailHtml
     });
 
-    // Send confirmation email to customer
-    await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
-      to: inquiry.email,
+    // Send confirmation email to customer using Mailjet
+    await sendMailjetEmail({
+      from: {
+        Email: process.env.EMAIL_FROM || 'noreply@ampm.si',
+        Name: 'AM & PM Global International'
+      },
+      to: [{
+        Email: inquiry.email,
+        Name: inquiry.name
+      }],
       subject: `✅ Your INOX Table Inquiry Confirmation - ${inquiry.inquiryId}`,
-      html: customerEmailHtml,
+      html: customerEmailHtml
     });
 
-    console.log(`✅ Inquiry emails sent successfully for ${inquiry.inquiryId}`);
+    console.log(`✅ Inquiry emails sent successfully via Mailjet for ${inquiry.inquiryId}`);
   } catch (error: any) {
-    console.error(`❌ Failed to send inquiry emails for ${inquiry.inquiryId}:`, error);
-    throw new Error(`Email sending failed: ${error.message}`);
+    console.error(`❌ Failed to send inquiry emails via Mailjet for ${inquiry.inquiryId}:`, error);
+    throw new Error(`Mailjet email sending failed: ${error.message}`);
   }
+}
+
+// Optional: Function to send emails with PDF attachments (for future use)
+export async function sendEmailWithPDF(
+  to: string,
+  toName: string,
+  subject: string,
+  htmlContent: string,
+  pdfBase64: string,
+  pdfFilename: string = 'quote.pdf'
+) {
+  await sendMailjetEmail({
+    from: {
+      Email: process.env.EMAIL_FROM || 'noreply@ampm.si',
+      Name: 'AM & PM Global International'
+    },
+    to: [{
+      Email: to,
+      Name: toName
+    }],
+    subject,
+    html: htmlContent,
+    attachments: [{
+      ContentType: 'application/pdf',
+      Filename: pdfFilename,
+      Base64Content: pdfBase64
+    }]
+  });
 }
