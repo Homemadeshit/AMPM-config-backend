@@ -249,18 +249,19 @@ export async function sendInquiryEmail(inquiry: InquiryData, priceBreakdown?: Pr
     });
 
     // Send confirmation email to customer using Mailjet
-    await sendMailjetEmail({
-      from: {
-        Email: process.env.EMAIL_FROM || 'noreply@ampm.si',
-        Name: 'AM & PM Global International'
-      },
-      to: [{
-        Email: inquiry.email,
-        Name: inquiry.name
-      }],
-      subject: `✅ Your INOX Table Inquiry Confirmation - ${inquiry.inquiryId}`,
-      html: customerEmailHtml
-    });
+    // COMMENTED OUT: Only send to sales team, not to customer
+    // await sendMailjetEmail({
+    //   from: {
+    //     Email: process.env.EMAIL_FROM || 'noreply@ampm.si',
+    //     Name: 'AM & PM Global International'
+    //   },
+    //   to: [{
+    //     Email: inquiry.email,
+    //     Name: inquiry.name
+    //   }],
+    //   subject: `✅ Your INOX Table Inquiry Confirmation - ${inquiry.inquiryId}`,
+    //   html: customerEmailHtml
+    // });
 
     console.log(`✅ Inquiry emails sent successfully via Mailjet for ${inquiry.inquiryId}`);
   } catch (error: any) {
